@@ -1,0 +1,59 @@
+name: Build Psych Engine HTML5
+
+on:
+  push:
+    branches: [ main, master ]  # Triggers when you push
+  workflow_dispatch:            # Allows manual trigger from GitHub UI
+
+jobs:
+  build-html5:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4.1.7
+      
+      - uses: krdlab/setup-haxe@master
+        with:
+          haxe-version: 4.3.4
+      
+      # Install C libraries needed to compile LuaJIT for HTML5
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386
+          sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev libx11-dev libxrandr-dev libxext-dev libxrender-dev
+      
+      # Install all Psych Engine libraries using the official script
+      - name: Install Haxelib
+        run: |
+          haxelib setup ~/haxelib
+          haxelib install hxcpp > /dev/null --quiet
+          chmod +x ./setup/unix.sh
+          sh ./setup/unix.sh
+          # Force Lime to recognize the HTML5 target
+          haxelib run lime setup -y
+      
+      # Prevents an interactive prompt from SScript
+      - name: Skip SScript setup mode
+        run: echo 'oy9:showMacroty8:loopCosti25y10:includeAllfg' >> ~/settings.cocoa
+      
+      # Sets the version number shown in-game
+      - name: Create Version Tag
+        run: echo "${{github.run_id}}" > VERSION
+      
+      # The MAIN build command (all fixes applied)
+      - name: Compile to HTML5
+        run: |
+          haxelib run lime build Project.xml html5 \
+            -final \
+            -D web \
+            -D officialBuild \
+            -D lime.jvm.mem=4096 \
+            --app-version="4.0.0-${{ github.run_id}}"
+      
+      # Uploads your playable game
+      - name: Publish Artifact
+        uses: actions/upload-artifact@v4.3.4
+        with:
+          name: PsychEngine-HTML5
+          path: export/release/html5/bin
